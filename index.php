@@ -84,3 +84,49 @@ $processor = $pipe(
 );
 
 $processor($people);
+
+
+/**
+ * Task: Create converter
+ * Input:
+ * [
+ *   'key1/key2/key2' => 'Hello',
+ *   'key1/key2/key3' => 'Goodbye',
+ *   'key2' => 'Foobar'
+ * ]
+ * Output:
+ * [
+ *   'key1' => [
+ *       'key2' => [
+ *           'key2'=> 'Hello',
+ *           'key3' => 'Goodbye',
+ *       ],
+ *   'key2' => 'Foobar',
+ * ]
+ */
+
+$input = [
+    'key1/key2/key2' => 'Hello',
+    'key1/key2/key3' => 'Goodbye',
+    'key2' => 'Foobar'
+];
+
+[$reduce, $mergeRecursive] = import(['reduce', 'mergeRecursive'], 'tkotosz/fp');
+[$split] = import(['split'], 'tkotosz/extra');
+
+// hmmm...
+$buildNestedArray = function($keys, $value) {
+    $target = [];
+
+    $current = &$target;
+    foreach($keys as $index) {
+        $current = &$current[$index];
+    }
+    $current = $value;
+
+    return $target;
+};
+$buildArrayFromKeyPath = fn($keyPath, $value) => $buildNestedArray($split('/')($keyPath), $value);
+$processor = $reduce(fn($acc, $value, $key) => $mergeRecursive($acc, $buildArrayFromKeyPath($key, $value)), []);
+
+print_r($processor($input)) . PHP_EOL;
