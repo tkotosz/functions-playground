@@ -42,6 +42,7 @@ $merge = 'array_merge';
 $mergeRecursive = 'array_merge_recursive';
 $not = fn($f) => fn(...$args) => !$f(...$args);
 $isNull = fn($x) => $x === null;
+$indentity = fn($x) => $x;
 
 return compact(
     'map',
@@ -55,5 +56,6 @@ return compact(
     'mergeRecursive',
     'partial',
     'not',
-    'isNull'
+    'isNull',
+    'indentity'
 );
