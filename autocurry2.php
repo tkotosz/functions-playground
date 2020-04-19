@@ -4,9 +4,10 @@
 function it($m,$p){echo"\033[3",$p?'2m✔︎':'1m✘'.register_shutdown_function(function(){die(1);})," It $m\033[0m\n";}
 function expect_error(Closure $f){try{$f(); return false;}catch(Throwable $e){return true;}}
 
-// NOTE: Only works for functions wihout variadic args :/
+// only curries the original function, does not curries returned callables! e.g.:
+// f(a,b,c,d) will be curried until all arg given
+// f(a,b) => g(c,d) will be curried only until f satisfied, then g will not be curried
 $autocurry = function(callable $f, ...$args) use (&$autocurry) {
-    $fargsCnt = (new ReflectionFunction($f))->getNumberOfParameters();
     $fargsReqCnt = (new ReflectionFunction($f))->getNumberOfRequiredParameters();
 
     if ($fargsReqCnt === 0) {
@@ -14,10 +15,7 @@ $autocurry = function(callable $f, ...$args) use (&$autocurry) {
     }
 
     if (count($args) >= $fargsReqCnt) {
-        $nargs = array_slice($args, 0, $fargsCnt);
-        $rargs = array_slice($args, $fargsCnt);
-        $result = $f(...$nargs);
-        return is_callable($result) ? $autocurry($result, ...$rargs) : $result;
+        return $f(...$args);
     }
 
     return fn(...$rargs) => $autocurry($f, ...array_merge($args, $rargs));
@@ -80,31 +78,14 @@ it('throws error for threeArgFuncWithOptionalArg(1)(2)(3)', expect_error(fn() =>
 it('returns result for threeArgFuncWithOptionalArg()(1)(2, 3)', $threeArgFuncWithOptionalArg()(1)(2, 3) === 6);
 it('returns result for threeArgFuncWithOptionalArg()(1)(2)', $threeArgFuncWithOptionalArg()(1)(2) === 3);
 
-// auto curry already curried functions
-echo PHP_EOL.PHP_EOL;
+$add = fn($a, $b) => $a + $b;
+$add = $autocurry($add);
+
+it('curries add(a,b) so add(a)(b) is possible', $add(1)(2) === 3);
+it('curries add(a,b) so add(a, b) is also possible', $add(1, 2) === 3);
 
 $add = fn($a) => fn($b) => $a + $b;
 $add = $autocurry($add);
 
-it('returns result for add(1, 2)', $add(1, 2) === 3);
-it('returns result for add(1)(2)', $add(1)(2) === 3);
-it('returns result for add()(1, 2)', $add()(1, 2) === 3);
-it('returns result for add()(1)(2)', $add()(1)(2) === 3);
-
-$addThree = fn($a) => fn($b) => fn($c) => $a + $b + $c;
-$addThree = $autocurry($addThree);
-
-it('returns result for addThree(1, 2, 3)', $addThree(1, 2, 3) === 6);
-it('returns result for addThree(1, 2)(3)', $addThree(1, 2)(3) === 6);
-it('returns result for addThree(1)(2, 3)', $addThree(1)(2, 3) === 6);
-it('returns result for addThree(1)(2)(3)', $addThree(1)(2)(3) === 6);
-
-$addThreeWithOptional = fn($a) => fn($b, $c = 0) => $a + $b + $c;
-$addThreeWithOptional = $autocurry($addThreeWithOptional);
-
-it('returns result for addThreeWithOptional(1, 2, 3)', $addThreeWithOptional(1, 2, 3) === 6);
-it('returns result for addThreeWithOptional(1, 2)', $addThreeWithOptional(1, 2) === 3);
-it('throws error for addThreeWithOptional(1, 2)(3)', expect_error(fn() => $addThreeWithOptional(1, 2)(3)));
-it('returns result for addThreeWithOptional(1)(2, 3)', $addThreeWithOptional(1)(2, 3) === 6);
-it('throws error for addThreeWithOptional(1)(2)(3)', expect_error(fn() => $addThreeWithOptional(1)(2)(3)));
-it('returns result for addThreeWithOptional(1)(2)', $addThreeWithOptional(1)(2) === 3);
+it('curries only f(a) of f(a) => f(b) so add(a)(b) is possible', $add(1)(2) === 3);
+it('curries only f(a) of f(a) => f(b) so add(a, b) is NOT possible', $add(1, 2) !== 3);
