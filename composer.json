@@ -1,0 +1,27 @@
+{
+    "name": "tkotosz/pipeline",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Tkotosz\\Pipeline\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tkotosz\\Pipeline\\Test\\": "test/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Tibor Kotosz",
+            "email": "kotosy@gmail.com"
+        }
+    ],
+    "require": {
+        "symfony/http-foundation": "^7.2",
+        "symfony/routing": "^7.2"
+    },
+    "require-dev": {
+        "symfony/uid": "^7.2"
+    }
+}

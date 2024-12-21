@@ -1,0 +1,26 @@
+<?php
+
+namespace Tkotosz\Pipeline\Test\Shared\Component;
+
+use Error;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Tkotosz\Pipeline\Error\RejectPipelineInput;
+
+class HandleApplicationErrors
+{
+    public function __construct() {}
+
+    public static function create(): self
+    {
+        return new self();
+    }
+
+    public function __invoke(Error $error): JsonResponse
+    {
+        return match(true) {
+            $error instanceof RejectPipelineInput => new JsonResponse(['error' => 'Not Found'], Response::HTTP_NOT_FOUND),
+            default => new JsonResponse(['error'=> 'An unexpected error occured while processing your request'], Response::HTTP_INTERNAL_SERVER_ERROR)
+        };
+    }
+}
