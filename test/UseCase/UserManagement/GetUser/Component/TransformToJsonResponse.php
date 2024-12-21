@@ -6,7 +6,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Data\User;
 
-class TransformToGetUserJsonResponse
+class TransformToJsonResponse
 {
     public function __construct() {}
 

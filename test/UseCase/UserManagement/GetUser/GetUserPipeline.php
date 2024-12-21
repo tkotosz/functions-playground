@@ -8,8 +8,8 @@ use Tkotosz\Pipeline\Http\Route;
 use Tkotosz\Pipeline\Pipeline;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Component\FetchUserFromDatabase;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Component\HandleGetUserErrors;
-use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Component\TransformToGetUserJsonResponse;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Component\TransformToGetUserQuery;
+use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\Component\TransformToJsonResponse;
 
 class GetUserPipeline
 {
@@ -27,7 +27,7 @@ class GetUserPipeline
             )
             ->pipe(TransformToGetUserQuery::create())
             ->pipe(FetchUserFromDatabase::create())
-            ->pipe(TransformToGetUserJsonResponse::create())
+            ->pipe(TransformToJsonResponse::create())
             ->pipeError(HandleGetUserErrors::create());
     }
 }
