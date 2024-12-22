@@ -33,12 +33,12 @@ class SaveUserToDatabase
     /** @throws Exception */
     private function saveToDatabase(User $user): User
     {
-        if (rand(0,1) === 1) {
-            throw new Exception('DB connect error');
+        if ($user->email === 'alreadyexists@test.test') {
+            throw new Exception('Integrity contraint violation');
         }
 
-        if (rand(0,1) === 1) {
-            throw new Exception('Integrity contraint violation');
+        if ($user->email === 'dberror@test.test') {
+            throw new Exception('DB connect error');
         }
 
         return $user;

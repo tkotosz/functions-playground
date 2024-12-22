@@ -2,24 +2,17 @@
 
 namespace Tkotosz\Pipeline;
 
-use Closure;
-use Error;
-use Throwable;
-use Tkotosz\Pipeline\Error\RejectPipelineInput;
+use Tkotosz\Pipeline\Pipeline\PipelineStep;
+use Tkotosz\Pipeline\Pipeline\PipelineStep\ErrorResult;
+use Tkotosz\Pipeline\Pipeline\PipelineStep\SuccessResult;
+use Tkotosz\Pipeline\Pipeline\PipelineStep\Result;
 
 class Pipeline
 {
     private function __construct(
         private string $name = '',
-        private array $stages = [],
-        private ?Closure $errorHandler = null,
-        private ?Closure $rejectHandler = null,
-        private ?Closure $resultHandler = null,
-        private bool $stopOnError = true
+        private array $steps = []
     ) {
-        $this->errorHandler ??= fn ($x) => $x;
-        $this->rejectHandler ??= fn ($x) => $x;
-        $this->resultHandler ??= fn ($x) => $x;
     }
 
     public static function named(string $name): self
@@ -27,50 +20,32 @@ class Pipeline
         return new self($name);
     }
 
-    public function pipe(callable $stage): self
+    public function pipe(callable $step): self
     {
         $pipeline = clone $this;
-        $pipeline->stages[] = $stage;
+
+        $step = ($step instanceof PipelineStep) ? $step : PipelineStep::fromCallable($step);
+        $pipeline->steps[] = [SuccessResult::class, $step];
 
         return $pipeline;
     }
 
-    public function pipeError(callable $errorHandler): self
+    public function pipeError(callable $step): self
     {
         $pipeline = clone $this;
-        $pipeline->errorHandler = $errorHandler(...);
+
+        $step = ($step instanceof PipelineStep) ? $step : PipelineStep::fromCallable($step);
+        $pipeline->steps[] = [ErrorResult::class, $step];
 
         return $pipeline;
     }
 
-    public function pipeRejectToError(): self
+    public function redirectErrorToSuccess(): self
     {
         $pipeline = clone $this;
-        $pipeline->rejectHandler = &$pipeline->errorHandler;
 
-        return $pipeline;
-    }
-
-    public function pipeResult(callable $resultHandler): self
-    {
-        $pipeline = clone $this;
-        $pipeline->resultHandler = $resultHandler(...);
-
-        return $pipeline;
-    }
-
-    public function stopOnError(): self
-    {
-        $pipeline = clone $this;
-        $pipeline->stopOnError = true;
-
-        return $pipeline;
-    }
-
-    public function continueOnError(): self
-    {
-        $pipeline = clone $this;
-        $pipeline->stopOnError = false;
+        $lastStepIndex = count($pipeline->steps) - 1;
+        $pipeline->steps[$lastStepIndex] = PipelineStep::fromCallable($pipeline->steps[$lastStepIndex], redirectErrorToSuccess: true);
 
         return $pipeline;
     }
@@ -82,33 +57,18 @@ class Pipeline
 
     public function execute(mixed $input): mixed
     {
-        $result = $input;
+        $result = ($input instanceof Result) ? $input : Result::success($input);
 
-        foreach ($this->stages as $stage) {
-            try {
-                $result = $stage($result);
-            } catch (Throwable $e) {
-                $result = new Error($e->getMessage(), $e->getCode(), $e);
+        foreach ($this->steps as $step) {
+            [$acceptsType, $stepHandler] = $step;
+
+            if (!$result instanceof $acceptsType) {
+                continue;
             }
-            
 
-            if ($result instanceof Error) {
-                $result = $this->handleError($result);
-
-                if ($this->stopOnError) {
-                    break;
-                }
-            }
+            $result = $stepHandler($result);
         }
 
-        return ($this->resultHandler)($result);
-    }
-
-    private function handleError(Error $error): mixed
-    {
-        return match(true) {
-            ($error instanceof RejectPipelineInput) => ($this->rejectHandler)($error),
-            default => ($this->errorHandler)($error)
-        };
+        return $result->unwrap();
     }
 }

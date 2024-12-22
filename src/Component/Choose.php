@@ -10,20 +10,20 @@ class Choose
     public function __construct(
         private Closure $condition,
         private array $choices = [],
-        private mixed $default = null
+        private ?Closure $default = null
     ) {
-        $this->default = new Error('Non of the available choices matched the defined condition');
+        $this->default ??= fn(mixed $input) => new Error('Non of the available choices matched the defined condition');
     }
 
-    public static function firstWithResultThatMatch(callable $condition)
+    public static function firstWithResultThatMatch(callable $condition): self
     {
         return new self($condition(...));
     }
 
-    public function withDefault(mixed $default): self
+    public function otherwise(callable $default): self
     {
         $choose = clone $this;
-        $choose->default = $default;
+        $choose->default = $default(...);
 
         return $choose;
     }
@@ -46,6 +46,6 @@ class Choose
             }
         }
 
-        return $this->default;
+        return ($this->default)($input);
     }
 }

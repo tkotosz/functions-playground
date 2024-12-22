@@ -39,7 +39,7 @@ class FetchUserFromDatabase
     /** @throws Exception */
     private function fetchFromDatabase(string $userId): array
     {
-        if (rand(0,1) === 1) {
+        if ($userId === 'd4594905-a8d2-44f9-a703-b31572a0bc46') {
             throw new Exception('DB connect error');
         }
 
