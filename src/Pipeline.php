@@ -40,16 +40,6 @@ class Pipeline
         return $pipeline;
     }
 
-    public function redirectErrorToSuccess(): self
-    {
-        $pipeline = clone $this;
-
-        $lastStepIndex = count($pipeline->steps) - 1;
-        $pipeline->steps[$lastStepIndex] = PipelineStep::fromCallable($pipeline->steps[$lastStepIndex], redirectErrorToSuccess: true);
-
-        return $pipeline;
-    }
-
     public function __invoke(mixed $input): mixed
     {
         return $this->execute($input);

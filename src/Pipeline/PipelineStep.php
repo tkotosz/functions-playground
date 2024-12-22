@@ -10,13 +10,12 @@ use Tkotosz\Pipeline\Pipeline\PipelineStep\Result;
 final class PipelineStep
 {
     private function __construct(
-        private readonly Closure $process, 
-        private readonly bool $redirectErrorToSuccess = false
+        private readonly Closure $process
     ) {}
 
-    public static function fromCallable(callable $process, bool $redirectErrorToSuccess = false): self
+    public static function fromCallable(callable $process): self
     {
-        return new self($process(...), $redirectErrorToSuccess);
+        return new self($process(...));
     }
 
     public function __invoke(Result $input): Result
@@ -27,16 +26,10 @@ final class PipelineStep
             $result = new Error($e->getMessage(), $e->getCode(), $e);
         }
 
-        $result = match(true) {
+        return match(true) {
             $result instanceof Result => $result,
             $result instanceof Error => Result::error($result),
             default => Result::success($result)
         };
-
-        if ($this->redirectErrorToSuccess) {
-            $result = Result::success($result->unwrap());
-        }
-
-        return $result;
     }
 }
