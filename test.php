@@ -1,5 +1,7 @@
 <?php
 
+use Symfony\Component\HttpFoundation\JsonResponse;
+
 require 'vendor/autoload.php';
 
 use Symfony\Component\HttpFoundation\Request;
@@ -22,89 +24,146 @@ $application = Pipeline::named('MyApp')
     ))
     ->pipeError(LogApplicationErrors::create())
     ->pipeError(TransformErrorToJsonResponse::create())
-    ->pipe(SendResponseToClient::create());
+    //->pipe(SendResponseToClient::create())
+;
 
-// Test Create User - Success
-$request = Request::create('/user', 'POST', content: json_encode(['name' => 'Tibor', 'email' => 'kotosy@gmail.com']));
-$application->execute($request);
-echo PHP_EOL;
+// TESTING
 
-// Test Create User - User Name Error
-$request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test', 'email' => 'test@test.test']));
-$application->execute($request);
-echo PHP_EOL;
+// testing "framework" :D https://gist.github.com/mathiasverraes/9046427
+function test($m,$p){echo"\033[3",$p?'2m✔︎':'1m✘'.register_shutdown_function(function(){die(1);})," It $m\033[0m\n";}
 
-// Test Create User - Error User Exists
-$request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test1', 'email' => 'alreadyexists@test.test']));
-$application->execute($request);
-echo PHP_EOL;
-
-// Test Create User - Error DB Connect error
-$request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test2', 'email' => 'dberror@test.test']));
-$application->execute($request);
-echo PHP_EOL;
-
-// Test Get User - Success
-$request = Request::create('/user/id/ccd2d3d9-9632-4bc2-b099-40175b54f3f8', 'GET');
-$application->execute($request);
-echo PHP_EOL;
-
-// Test Get User - Error User Does Not Exist
-$request = Request::create('/user/id/ccd2d3d9-9632-4bc2-b099-40175b54f3f9', 'GET');
-$application->execute($request);
-echo PHP_EOL;
-
-// Test Get User - Error DB Connect error
-$request = Request::create('/user/id/d4594905-a8d2-44f9-a703-b31572a0bc46', 'GET');
-$application->execute($request);
-echo PHP_EOL;
-
-// Test 404
-$request = Request::create('/foo/bar', 'GET');
-$application->execute($request);
-echo PHP_EOL;
-
-
-$simplePipeline = Pipeline::named('simple')
-    ->pipe(fn(int $x) => $x * 2)    
-    ->pipe(fn(int $x) => $x + 1);
+test('Test Create User - Success', (function () use ($application) {
+    $request = Request::create('/user', 'POST', content: json_encode(['name' => 'Tibor', 'email' => 'kotosy@gmail.com']));
+    $response = $application->execute($request);
     
-echo $simplePipeline->execute(10) . PHP_EOL; // 21
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 201 &&
+        json_decode($response->getContent(), true)['message'] === 'User Created Successfully' &&
+        !empty(json_decode($response->getContent(), true)['user_id'])
+    );
+})());
 
-$simplePipelineWithError = Pipeline::named('simple')
-    ->pipe(fn(int $x) => $x * 2)
-    ->pipe(fn($x) => new Error('stop!'))    
-    ->pipe(fn(int $x) => $x + 1);
+test('Test Create User - User Name Error', (function () use ($application) {
+    $request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test', 'email' => 'test@test.test']));
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 400 &&
+        json_decode($response->getContent(), true)['error'] === 'User name Test is too short (min length: 5)'
+    );
+})());
 
-$result = $simplePipelineWithError->execute(10);
-var_dump($result instanceof Error) . PHP_EOL; // true
+test('Test Create User - Error User Exists', (function () use ($application) {
+    $request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test1', 'email' => 'alreadyexists@test.test']));
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 409 &&
+        json_decode($response->getContent(), true)['error'] === 'User with email alreadyexists@test.test already exists'
+    );
+})());
 
-$simplePipelineWithErrorHandled = Pipeline::named('simple')
-    ->pipe(fn(int $x) => $x * 2)
-    ->pipe(fn($x) => new Error('stop!'))    
-    ->pipe(fn(int $x) => $x + 1)
-    ->pipeError(fn(Error $error) => 'Hello from error handler');
+test('Test Create User - Error DB Connect error', (function () use ($application) {
+    $request = Request::create('/user', 'POST', content: json_encode(['name' => 'Test2', 'email' => 'dberror@test.test']));
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 500 &&
+        json_decode($response->getContent(), true)['error'] === 'An unexpected error occured while processing your request'
+    );
+})());
 
-$result = $simplePipelineWithErrorHandled->execute(10);
-var_dump($result) . PHP_EOL; // Hello from error handler
+test('Test Get User - Success', (function () use ($application) {
+    $request = Request::create('/user/id/ccd2d3d9-9632-4bc2-b099-40175b54f3f8', 'GET');
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 200 &&
+        json_decode($response->getContent(), true)['name'] === 'Tibor'
+    );
+})());
 
-$simplePipelineWithErrorHandledThenContinue = Pipeline::named('simple')
-    ->pipe(fn(int $x) => $x * 2)
-    ->pipe(fn($x) => new Error('stop!'))    
-    ->pipe(fn(int $x) => $x + 1)
-    ->pipeError(fn(Error $error) => 2000)
-    ->pipe(fn(int $x) => $x * 2);
+test('Test Get User - Error User Does Not Exist', (function () use ($application) {
+    $request = Request::create('/user/id/ccd2d3d9-9632-4bc2-b099-40175b54f3f9', 'GET');
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 404
+    );
+})());
 
-$result = $simplePipelineWithErrorHandledThenContinue->execute(10);
-var_dump($result) . PHP_EOL; // 4000
+test('Test Get User - Error DB Connect error', (function () use ($application) {
+    $request = Request::create('/user/id/d4594905-a8d2-44f9-a703-b31572a0bc46', 'GET');
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 500
+    );
+})());
 
-$simplePipelineErrorAfterError = Pipeline::named('simple')
-    ->pipe(fn(int $x) => $x * 2)
-    ->pipe(fn($x) => new Error('stop!'))    
-    ->pipe(fn(int $x) => $x + 1)
-    ->pipeError(fn(Error $error) => $error)
-    ->pipeError(fn(Error $error) => new Error('aaa',0,$error))
-    ->pipeError(fn(Error $error) => $error->getMessage() . ' ' . $error->getPrevious()?->getMessage());
+test('Test 404', (function () use ($application) {
+    $request = Request::create('/foo/bar', 'GET');
+    $response = $application->execute($request);
+    
+    return (
+        $response instanceof JsonResponse &&
+        $response->getStatusCode() === 404
+    );
+})());
 
-$result = $simplePipelineErrorAfterError->execute(10);
-var_dump($result) . PHP_EOL; // aaa stop!
+test('pipeline returns success result', (function () use ($application) {
+    $simplePipeline = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x * 2)    
+        ->pipe(fn(int $x) => $x + 1);
+    
+    return $simplePipeline->execute(10) === 21;
+})());
+
+test('pipeline returns error result', (function () use ($application) {
+    $simplePipelineWithError = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x * 2)
+        ->pipe(fn($x) => new Error('stop!'))    
+        ->pipe(fn(int $x) => $x + 1);
+
+    return $simplePipelineWithError->execute(10) instanceof Error;
+})());
+
+test('pipeline pipes error', (function () use ($application) {
+    $simplePipelineWithErrorHandled = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x * 2)
+        ->pipe(fn($x) => new Error('stop!'))    
+        ->pipe(fn(int $x) => $x + 1)
+        ->pipeError(fn(Error $error) => 'Hello from error handler');
+
+    return $simplePipelineWithErrorHandled->execute(10) === 'Hello from error handler';
+})());
+
+test('pipeline pipes to success after resolving error', (function () use ($application) {
+    $simplePipelineWithErrorHandledThenContinue = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x * 2)
+        ->pipe(fn($x) => new Error('stop!'))    
+        ->pipe(fn(int $x) => $x + 1)
+        ->pipeError(fn(Error $error) => 2000)
+        ->pipe(fn(int $x) => $x * 2);
+
+    return $simplePipelineWithErrorHandledThenContinue->execute(10) === 4000;
+})());
+
+test('pipeline can chain error handlers', (function () use ($application) {
+    $simplePipelineErrorAfterError = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x * 2)
+        ->pipe(fn($x) => new Error('stop!'))    
+        ->pipe(fn(int $x) => $x + 1)
+        ->pipeError(fn(Error $error) => $error)
+        ->pipeError(fn(Error $error) => new Error('aaa',0,$error))
+        ->pipeError(fn(Error $error) => $error->getMessage() . ' ' . $error->getPrevious()?->getMessage());
+
+    return $simplePipelineErrorAfterError->execute(10) === 'aaa stop!';
+})());
