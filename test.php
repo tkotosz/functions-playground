@@ -14,6 +14,8 @@ use Tkotosz\Pipeline\Test\Shared\Component\SendResponseToClient;
 use Tkotosz\Pipeline\Test\Shared\Component\TransformErrorToJsonResponse;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\CreateUser\CreateUserPipeline;
 use Tkotosz\Pipeline\Test\UseCase\UserManagement\GetUser\GetUserPipeline;
+use Tkotosz\Pipeline\Pipeline\PipelineStep\PipelineStepHandler;
+use Tkotosz\Pipeline\Pipeline\PipelineStep;
 
 $application = Pipeline::named('MyApp')
     ->pipe(ProcessRequest::with(
@@ -30,7 +32,7 @@ $application = Pipeline::named('MyApp')
 // TESTING
 
 // testing "framework" :D https://gist.github.com/mathiasverraes/9046427
-function test($m,$p){echo"\033[3",$p?'2m✔︎':'1m✘'.register_shutdown_function(function(){die(1);})," It $m\033[0m\n";}
+function test($m,$p){echo"\033[3",$p?'2m✔︎':'1m✘'.register_shutdown_function(function(){die(1);})," $m\033[0m\n";}
 
 test('Test Create User - Success', (function () use ($application) {
     $request = Request::create('/user', 'POST', content: json_encode(['name' => 'Tibor', 'email' => 'kotosy@gmail.com']));
@@ -166,4 +168,20 @@ test('pipeline can chain error handlers', (function () use ($application) {
         ->pipeError(fn(Error $error) => $error->getMessage() . ' ' . $error->getPrevious()?->getMessage());
 
     return $simplePipelineErrorAfterError->execute(10) === 'aaa stop!';
+})());
+
+test('test pipeline steps', (function () use ($application) {
+    $simplePipelineErrorAfterError = Pipeline::named('simple')
+        ->pipe(fn(int $x) => $x + 1)
+        ->pipe(PipelineStepHandler::fromCallable(fn($x) => $x + 1))
+        ->pipe(PipelineStep::fromSuccessHandler(fn($x) => $x + 1))
+        ->pipe(PipelineStep::fromSuccessHandler(PipelineStepHandler::fromCallable(fn($x) => $x + 1)))
+        ->pipe(fn($x) => new Error($x))
+        ->pipe(PipelineStep::passthrough())
+        ->pipe(PipelineStep::fromErrorHandler(fn(Error $error) => $error->getMessage() + 2))
+    ;
+
+    $result = $simplePipelineErrorAfterError->execute(10);
+
+    return $result === 16;
 })());
